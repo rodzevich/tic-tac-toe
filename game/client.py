@@ -72,7 +72,7 @@ class Client(object):
         action = data.get('action')
         if action == 'queued':
             print('Please wait for other player')
-        elif action == 'board':
+        elif action == 'turn':
             u = data['you']
             print('You: {}({}) wins:{} loses:{} draws:{} plays:{}'.format(
                 u['name'], u['sign'], u['wins'], u['loses'], u['draws'], u['plays']))
@@ -82,7 +82,7 @@ class Client(object):
 
             self.draw_board(data.get('board'))
 
-            if data['turn'] == 'you':
+            if data['active'] == 'you':
                 self.state = Client.MY_TURN
                 print('Your turn...')
             else:

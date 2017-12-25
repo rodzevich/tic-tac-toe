@@ -5,7 +5,8 @@ from aiohttp import WSMsgType, web
 from aiohttp.web import WebSocketResponse
 
 from game.logger import getLogger
-from game.models import AI, Room, User
+from game.models.room import Room
+from game.models.user import AI, User
 
 logger = getLogger(__name__)
 
@@ -31,6 +32,14 @@ class WebSocketHandler(web.View):
         await ws.prepare(self.request)
 
         user.websocket = ws
+
+        await self.user_connected(user, app)
+
+        await self.user_message_loop(user, app)
+
+        return ws
+
+    async def user_connected(self, user, app):
         app['online'].add(user)
         logger.info('User {} connected'.format(user.name))
 
@@ -47,28 +56,27 @@ class WebSocketHandler(web.View):
                         user.name, user2.name))
         else:
             app['waiting'] = user
-            await ws.send_json({'action': 'queued'})
+            await user.websocket.send_json({'action': 'queued'})
 
             app['ai_task'] = asyncio.ensure_future(self.run_ai_game(app))
 
-        async for msg in ws:
+    async def user_message_loop(self, user, app):
+        async for msg in user.websocket:
             logger.debug('MSG: %s', msg)
             if msg.tp == WSMsgType.text:
                 if msg.data == 'close':
                     logger.info('Close ws connection')
-                    await ws.close()
+                    await user.websocket.close()
                 else:
                     try:
                         data = json.loads(msg.data)
                     except json.decoder.JSONDecodeError:
-                        pass
+                        logger.error('Invalid JSON request: %s', msg.data)
                     else:
                         logger.info('Got request: %s', data)
                         await self.process_request(user, data, app)
             elif msg.tp == WSMsgType.error:
-                logger.exception('Got ws error %s', id(ws))
-
-        return ws
+                logger.exception('Got ws error %s', id(user.websocket))
 
     def response_error(self, message):
         return web.json_response({'error': message}, status=400)
@@ -80,7 +88,13 @@ class WebSocketHandler(web.View):
         act = data['action']
         args = data['args']
         if act == 'turn':
-            await user.room.do_turn(user, args[0], args[1])
+            try:
+                x, y = int(args[0]), int(args[1])
+                assert 0 <= x <= 2
+                assert 0 <= y <= 2
+            except (IndexError, ValueError, AssertionError):
+                return await user.send({'error': 'Invalid turn args'})
+            await user.room.do_turn(user, x, y)
 
     async def run_ai_game(self, app):
         await asyncio.sleep(app['config'].max_waiting)
