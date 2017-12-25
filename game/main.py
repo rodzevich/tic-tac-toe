@@ -31,6 +31,8 @@ async def on_start(app):
     app['rooms'] = set()
     app['waiting'] = None  # slot for waiting user
 
+    await app['db'].users.create_index('name', unique=True)
+
 
 async def ping(app):
     while True:

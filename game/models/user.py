@@ -25,7 +25,7 @@ class User(object):
 
     @classmethod
     async def load_from_db(cls, name, db):
-        data = await db.players.find_one({'name': name})
+        data = await db.users.find_one({'name': name})
 
         if data:
             user = cls(name)
@@ -36,7 +36,7 @@ class User(object):
             return user
 
     async def save_to_db(self, db):
-        await db.players.update(
+        await db.users.update(
             {'name': self.name},
             self.json,
             upsert=True,
