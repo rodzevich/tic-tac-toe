@@ -1,0 +1,45 @@
+version: '2.3'
+services:
+  mongo_db:
+    container_name: mongo_db
+    image: mongo:3.4
+    ports:
+      - "27017:27017"
+    expose:
+      - "27017"
+    volumes:
+      - ./dbvolume:/data/db
+
+  game_server:
+    container_name: game_server
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - MONGODB_URI=mongodb://mongo_db:27017/tictactoe
+      - PING_INTERVAL=20
+      - MAX_WAITING=10
+    entrypoint:
+      - /usr/local/bin/gunicorn
+      - game.main:app
+      - -b=0.0.0.0:8080
+      - -t=60
+      - --worker-class=aiohttp.worker.GunicornUVLoopWebWorker
+      - --reload
+    ports:
+      - "8080:8080"
+    links:
+      - mongo_db
+
+  game_client:
+    container_name: game_client
+    build: .
+    volumes:
+      - .:/app
+    entrypoint:
+      - python
+      - game/client.py
+    environment:
+      - HOST=game_server:8080
+    links:
+      - game_server
